@@ -35,14 +35,13 @@ class Crawler:
             sess: ClientSession,
             url: str
     ) -> bool:
-        nonlocal comparing_with_last_body
         try:
             async with sess.get(url) as resp:
                 content = await resp.text()
-                if content == comparing_with_last_body:
+                if content == self.comparing_with_last_body:
                     raise ValueError("same page from now on")
                 else:
-                    comparing_with_last_body = content
+                    self.comparing_with_last_body = content
                     return False
         except Exception:
             return True
