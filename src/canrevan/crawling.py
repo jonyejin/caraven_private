@@ -166,10 +166,12 @@ class Crawler:
             # Wait for the tasks to be complete and close the http client session and
             # process-pool executor
         await asyncio.wait(futures)
+        await sess.close()
         pool.shutdown(wait=True)
 
     def reduce_to_array(
             self,
+            sess:ClientSession,
             urls: Iterable[str],  # 모든 페이지
             include_reporter_name: bool,
             parse_fn: Optional[Callable[[str], T]] = None,
@@ -183,21 +185,20 @@ class Crawler:
             if data[1] is not None:
                 results.append(data[1])
 
-        # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
-        loop = asyncio.get_event_loop()
-        # utils.ignore_aiohttp_ssl_error(loop)
-
         results = []
 
         # 중복 제거
 
-        sess = ClientSession(
-            headers=self.request_headers,
-            timeout=ClientTimeout(total=self.request_timeout),
-        )
-
+        # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
+        loop = asyncio.get_event_loop()
+        utils.ignore_aiohttp_ssl_error(loop)
         done = loop.run_until_complete(self._preprocess_urls(urls, False, sess, parse_fn)) # 리턴값; 하루에 봐야할 페이지들
+        loop.close()
+
+        loop = asyncio.get_event_loop()
+        utils.ignore_aiohttp_ssl_error(loop)
         loop.run_until_complete(self._crawl_and_reduce(done, include_reporter_name, parse_fn, callback_fn))
+        loop.close()
         return results
 
     def reduce_to_file(

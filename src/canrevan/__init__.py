@@ -6,6 +6,7 @@ import tqdm
 import parsing as parsing
 import utils as utils
 from crawling import Crawler
+from aiohttp import ClientSession, ClientTimeout
 
 DEFAULT_USER_AGENT_STRING = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -17,6 +18,11 @@ DEFAULT_USER_AGENT_STRING = (
 
 def _main():
     args = _create_argument_parser().parse_args()
+
+    sess = ClientSession(
+        headers={"user-agent": args.user_agent},
+        timeout=args.timeout,
+    )
 
     # Create a crawler for collecting article urls and news contents.
     crawler = Crawler(
@@ -33,7 +39,7 @@ def _main():
 
     with tqdm.tqdm(nav_urls, desc="[*] collect article urls") as tbar:
         article_urls = crawler.reduce_to_array(
-            nav_urls, args.include_reporter_name, parse_fn=parsing.extract_article_urls, update_fn=tbar.update
+            sess, nav_urls, args.include_reporter_name, parse_fn=parsing.extract_article_urls, update_fn=tbar.update
         )
 
     # Flatten the grouped urls and remove duplicates from the array.
