@@ -42,7 +42,7 @@ class Crawler:
         # 하나의 날에 대해서 중복인 부분까지 실행하고, False를 리턴해주는 함수.
 
         try:
-            async with sess.get(url) as resp:
+            async with sess.get(url, ssl=False) as resp:
                 content = await resp.text()
 
                 first_url = await asyncio.get_event_loop().run_in_executor(
@@ -68,7 +68,7 @@ class Crawler:
             parse_fn: Optional[Callable[[str, bool], T]] = None,
     ) -> Tuple[str, str]:
         try:
-            async with sess.get(url) as resp:
+            async with sess.get(url, ssl=False) as resp:
                 content = await resp.text()
 
             # Run `parse_fn` in subprocess from process-pool for parallelism.
