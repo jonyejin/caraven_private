@@ -22,6 +22,8 @@ class Crawler:
             num_parsing_processes: int = 1,
             request_headers: Optional[Dict[str, str]] = None,
             request_timeout: Optional[float] = None,
+            folder_name: str = 'news/'
+
     ):
         self.concurrent_tasks = concurrent_tasks
         self.num_parsing_processes = num_parsing_processes
@@ -124,7 +126,7 @@ class Crawler:
                 futures.append(f)
             # flatten처리
             done, _ = await asyncio.wait(futures) # done: [Task]
-
+            await sess.close()
             for task in done:
                 res += task.result()
 
