@@ -129,7 +129,7 @@ class Crawler:
             # A callback function to reduce collected data to the output file.
             def callback_fn(data: Tuple[Optional[str], Optional[str]]):
                 nonlocal written
-                single_fp = open(f"news/{written}.txt", "w")
+                single_fp = open(f"news/{utils.current_time()}/{written}.txt", "w")
                 if update_fn is not None:
                     update_fn()
 

@@ -47,6 +47,14 @@ def ignore_aiohttp_ssl_error(loop: AbstractEventLoop):
 
     loop.set_exception_handler(ignore_ssl_error)
 
+def current_time():
+    from datetime import datetime
+    # datetime object containing current date and time
+    now = datetime.now()
+    # dd/mm/YY H:M:S
+    dt_string = now.strftime("%Y_%M_%D_%H_%M_%S")
+    # print("date and time =", dt_string)
+    return dt_string
 
 def remove_reporter_name(s: str):
     import re
