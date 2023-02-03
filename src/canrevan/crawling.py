@@ -3,7 +3,7 @@ import asyncio
 import warnings
 from asyncio import Semaphore
 from concurrent.futures import Executor, ProcessPoolExecutor
-from typing import Callable, Dict, Iterable, List, Optional, TypeVar
+from typing import Callable, Dict, Iterable, List, Optional, TypeVar, Union, Tuple, TextIO
 
 from aiohttp import ClientSession, ClientTimeout
 
@@ -17,11 +17,11 @@ T = TypeVar("T")
 
 class Crawler:
     def __init__(
-        self,
-        concurrent_tasks: int = 500,
-        num_parsing_processes: int = 1,
-        request_headers: Optional[Dict[str, str]] = None,
-        request_timeout: Optional[float] = None,
+            self,
+            concurrent_tasks: int = 500,
+            num_parsing_processes: int = 1,
+            request_headers: Optional[Dict[str, str]] = None,
+            request_timeout: Optional[float] = None,
     ):
         self.concurrent_tasks = concurrent_tasks
         self.num_parsing_processes = num_parsing_processes
@@ -29,14 +29,14 @@ class Crawler:
         self.request_timeout = request_timeout
 
     async def _fetch_and_parse(
-        self,
-        sem: Semaphore,
-        pool: Executor,
-        sess: ClientSession,
-        url: str,
-        include_reporter_name: bool,
-        parse_fn: Optional[Callable[[str, bool], T]] = None,
-    ) -> Optional[str]:
+            self,
+            sem: Semaphore,
+            pool: Executor,
+            sess: ClientSession,
+            url: str,
+            include_reporter_name: bool,
+            parse_fn: Optional[Callable[[str, bool], T]] = None,
+    ) -> Tuple[str, str]:
         try:
             async with sess.get(url) as resp:
                 content = await resp.text()
@@ -50,14 +50,14 @@ class Crawler:
             content = None
 
         sem.release()
-        return content
+        return (url, content)
 
     async def _crawl_and_reduce(
-        self,
-        urls: Iterable[str],
-        include_reporter_name: bool,
-        parse_fn: Optional[Callable[[str], T]] = None,
-        callback_fn: Optional[Callable[[Optional[T]], None]] = None,
+            self,
+            urls: Iterable[str],
+            include_reporter_name: bool,
+            parse_fn: Optional[Callable[[str], T]] = None,
+            callback_fn: Optional[Callable[[Tuple[str, str]], None]] = None,
     ):
         # Create a semaphore to limit the number of concurrent tasks, a process-pool
         # executor to run `parse_fn` in parallel and a http client session for
@@ -80,7 +80,7 @@ class Crawler:
 
             # Add done-callback function to the future.
             if callback_fn is not None:
-                f.add_done_callback(lambda f: callback_fn(f.result()))
+                f.add_done_callback(lambda k: callback_fn(data=k.result()))
 
             futures.append(f)
 
@@ -91,19 +91,19 @@ class Crawler:
         pool.shutdown(wait=True)
 
     def reduce_to_array(
-        self,
-        urls: Iterable[str],
-        include_reporter_name: bool,
-        parse_fn: Optional[Callable[[str], T]] = None,
-        update_fn: Optional[Callable[[], None]] = None,
+            self,
+            urls: Iterable[str],
+            include_reporter_name: bool,
+            parse_fn: Optional[Callable[[str], T]] = None,
+            update_fn: Optional[Callable[[], None]] = None,
     ) -> List[T]:
         # A callback function to reduce collected data to the array.
-        def callback_fn(data: Optional[T]):
+        def callback_fn(data: Tuple[Optional[str], Optional[str]]):
             if update_fn is not None:
                 update_fn()
 
-            if data is not None:
-                results.append(data)
+            if data[1] is not None:
+                results.append(data[1])
 
         # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
         loop = asyncio.get_event_loop()
@@ -115,32 +115,57 @@ class Crawler:
         return results
 
     def reduce_to_file(
-        self,
-        urls: Iterable[str],
-        filename: str,
-        include_reporter_name: bool,
-        parse_fn: Optional[Callable[[str], T]] = None,
-        update_fn: Optional[Callable[[], None]] = None,
+            self,
+            urls: Iterable[str],
+            filename: str,
+            include_reporter_name: bool,
+            parse_fn: Optional[Callable[[str], T]] = None,
+            update_fn: Optional[Callable[[], None]] = None,
     ) -> int:
-        with open(filename, "w") as fp:
+        local = True
+        if local:
+            written = 0
+
             # A callback function to reduce collected data to the output file.
-            def callback_fn(data: Optional[T]):
+            def callback_fn(data: Tuple[Optional[str], Optional[str]]):
+                nonlocal written
+                single_fp = open(f"news/{written}.txt", "w")
                 if update_fn is not None:
                     update_fn()
 
-                if data is not None:
+                if data[1] is not None:
                     # Increase the counter which indicates the number of actual reduced
                     # items.
-                    nonlocal written
                     written += 1
 
-                    fp.write(str(data) + "\n")
+                    single_fp.write(str(data[1]) + "\n")
+                    single_fp.close()
 
-            # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
+                # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
+
             loop = asyncio.get_event_loop()
-            utils.ignore_aiohttp_ssl_error(loop)
-
-            written = 0
+            # utils.ignore_aiohttp_ssl_error(loop)
             loop.run_until_complete(self._crawl_and_reduce(urls, include_reporter_name, parse_fn, callback_fn))
+        else:
+            with open(filename, "w") as fp:
+                # A callback function to reduce collected data to the output file.
+                def callback_fn(data: Tuple[Optional[str], Optional[str]]):
+                    if update_fn is not None:
+                        update_fn()
+
+                    if data is not None:
+                        # Increase the counter which indicates the number of actual reduced
+                        # items.
+                        nonlocal written
+                        written += 1
+
+                        fp.write(str(data) + "\n")
+
+                # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
+                loop = asyncio.get_event_loop()
+                utils.ignore_aiohttp_ssl_error(loop)
+
+                written = 0
+                loop.run_until_complete(self._crawl_and_reduce(urls, include_reporter_name, parse_fn, callback_fn))
 
         return written

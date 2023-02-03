@@ -36,7 +36,7 @@ def _main():
         )
 
     # Flatten the grouped urls and remove duplicates from the array.
-    article_urls = {url for urls in article_urls for url in urls}
+    article_urls = {url for urls in article_urls for url in set(urls)}
     print(f"[*] total collected articles: {len(article_urls)}")
 
     # Crawl news articles from the collected article urls and save the content to the

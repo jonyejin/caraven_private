@@ -63,14 +63,26 @@ def parse_article_content(document: str, include_reporter_name: bool) -> str:
         ]
     )
 
+    splitted = content.split(sep='\n')
+
+    # Remove one line news.
+    if len(splitted) == 1:
+        raise ValueError("Too short-only one line")
+
     # Remove reporter name part if set.
     if not include_reporter_name:
-        splitted = content.split(sep='\n')
+        splitted[0] = utils.remove_reporter_name(splitted[0])
         content = "\n".join(splitted[1:])
-        content = utils.remove_reporter_name(splitted[0]) + content
+
+    # Remove All rights reserved.
+    if splitted[-1] == "All rights reserved.":
+        splitted = splitted[:-1]
+
+    content = "\n".join(splitted)
 
     # Remove empty string
     if content == "":
         raise ValueError("there is no news article content.")
 
-    return json.encoder.encode_basestring(content)
+    # return json.encoder.encode_basestring(content)
+    return content
