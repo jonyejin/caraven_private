@@ -22,11 +22,13 @@ class Crawler:
             num_parsing_processes: int = 1,
             request_headers: Optional[Dict[str, str]] = None,
             request_timeout: Optional[float] = None,
+            directory_name: str = None
     ):
         self.concurrent_tasks = concurrent_tasks
         self.num_parsing_processes = num_parsing_processes
         self.request_headers = request_headers
         self.request_timeout = request_timeout
+        self.directory_name = directory_name
 
     async def _fetch_and_parse(
             self,
@@ -129,7 +131,11 @@ class Crawler:
             # A callback function to reduce collected data to the output file.
             def callback_fn(data: Tuple[Optional[str], Optional[str]]):
                 nonlocal written
-                single_fp = open(f"news/{utils.current_time()}/{written}.txt", "w")
+
+                from pathlib import Path
+                p = f"news/{self.directory_name}/"
+                Path(p).mkdir(parents=True, exist_ok=True)
+                single_fp = open(p + f"{written}.txt", "w")
                 if update_fn is not None:
                     update_fn()
 

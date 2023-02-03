@@ -52,7 +52,7 @@ def current_time():
     # datetime object containing current date and time
     now = datetime.now()
     # dd/mm/YY H:M:S
-    dt_string = now.strftime("%Y_%M_%D_%H_%M_%S")
+    dt_string = now.strftime("%Y_%m_%d_%H_%M_%S")
     # print("date and time =", dt_string)
     return dt_string
 

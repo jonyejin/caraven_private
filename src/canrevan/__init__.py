@@ -24,6 +24,7 @@ def _main():
         num_parsing_processes=args.num_cores,
         request_headers={"user-agent": args.user_agent},
         request_timeout=args.timeout,
+        directory_name=args.directory_name
     )
 
     # Collect article urls from navigation pages.
@@ -116,6 +117,12 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--include_reporter_name",
         default=False,
+        help="",
+    )
+
+    parser.add_argument(
+        "--directory_name",
+        default=None,
         help="",
     )
 
