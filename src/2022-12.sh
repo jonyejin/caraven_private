@@ -1,0 +1,1 @@
+python3 __main__.py --category 101 102 103 104 105 --start_date 20221201 --end_date 20221231 --max_page 500 --num_cores 16 --directory_name 202212
