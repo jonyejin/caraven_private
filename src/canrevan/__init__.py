@@ -27,8 +27,8 @@ def _main():
     )
 
     # Collect article urls from navigation pages.
-    nav_urls = _prepare_nav_urls(args)
-    print(f"[*] navigation pages: {len(nav_urls)}")
+    nav_urls: List[List[str]] = _prepare_nav_urls(args)
+    print(f"[*] whole navigation pages: {len(nav_urls)}")
 
     with tqdm.tqdm(nav_urls, desc="[*] collect article urls") as tbar:
         article_urls = crawler.reduce_to_array(
@@ -36,6 +36,8 @@ def _main():
         )
 
     # Flatten the grouped urls and remove duplicates from the array.
+
+    # DO NOT FLATTEN!
     article_urls = {url for urls in article_urls for url in set(urls)}
     print(f"[*] total collected articles: {len(article_urls)}")
 
@@ -56,13 +58,16 @@ def _main():
     )
 
 
-def _prepare_nav_urls(args: argparse.Namespace) -> List[str]:
+def _prepare_nav_urls(args: argparse.Namespace) -> List[List[str]]:
     return [
-        f"https://news.naver.com/main/list.nhn?mode=LSD&mid=shm"
-        f"&sid1={category}&date={date}&page={page}"
-        for category in args.category
+        [
+            f"https://news.naver.com/main/list.nhn?mode=LSD&mid=shm"
+            f"&sid1={category}&date={date}&page={page}"
+            for category in args.category
+            for page in range(1, args.max_page + 1)
+
+        ]
         for date in utils.drange(args.start_date, args.end_date, args.skip_days)
-        for page in range(1, args.max_page + 1)
     ]
 
 

@@ -4,7 +4,7 @@ import warnings
 from asyncio import Semaphore
 from concurrent.futures import Executor, ProcessPoolExecutor
 from typing import Callable, Dict, Iterable, List, Optional, TypeVar, Union, Tuple, TextIO
-
+import tqdm
 from aiohttp import ClientSession, ClientTimeout
 
 import utils as utils
@@ -28,20 +28,30 @@ class Crawler:
         self.request_headers = request_headers
         self.request_timeout = request_timeout
 
-    comparing_with_last_body = ""
+    comparing_with_last_page_first_url = ""
 
     async def is_duplicate(
             self,
+            pool: Executor,
             sess: ClientSession,
-            url: str
+            url: str,
+            parse_fn: Optional[Callable[[str], T]] = None,
     ) -> bool:
+        # 하나의 날에 대해서 중복인 부분까지 실행하고, False를 리턴해주는 함수.
+
         try:
             async with sess.get(url) as resp:
                 content = await resp.text()
-                if content == self.comparing_with_last_body:
+
+                first_url = await asyncio.get_event_loop().run_in_executor(
+                    pool, parse_fn, content
+                )
+                first_url = first_url[0]
+                if first_url == self.comparing_with_last_page_first_url:
+                    print(url)
                     raise ValueError("same page from now on")
                 else:
-                    self.comparing_with_last_body = content
+                    self.comparing_with_last_page_first_url = first_url
                     return False
         except Exception:
             return True
@@ -70,13 +80,66 @@ class Crawler:
         sem.release()
         return (url, content)
 
+    async def _preprocess_urls_for_day(self, same_date_urls, pool, sess, parse_fn, callback_fn) -> [str]:
+        final_url = []
+        for index, url in enumerate(same_date_urls):
+            dup = await self.is_duplicate(pool, sess, url, parse_fn)
+            if dup:
+                # add to list
+                final_url = same_date_urls[:index]
+                break
+            elif index == len(same_date_urls)-1:
+                final_url = same_date_urls[:index]
+        callback_fn()
+        return final_url
+
+    async def _preprocess_urls(
+            self,
+            urls: Iterable[Iterable[str]],  # 모든 url
+            include_reporter_name: bool,
+            parse_fn: Optional[Callable[[str], T]] = None,
+            callback_fn: Optional[Callable[[Tuple[str, str]], None]] = None,
+    ) -> Iterable[str]:
+        res = []
+        # yejin: 하루 안에서는 순서대로 해 겹치지 말고
+        sess = ClientSession(
+            headers=self.request_headers,
+            timeout=ClientTimeout(total=self.request_timeout),
+        )
+        pool = ProcessPoolExecutor(max_workers=10)
+
+        # without_overlaps
+        final_urls: Iterable[Iterable[str]] = []
+        futures = []
+
+        with tqdm.tqdm(urls, desc="[*] check duplicated urls and make flattened list") as tbar:
+            # 하루에 대해서
+            for same_date_urls in urls:
+                f = asyncio.ensure_future(self._preprocess_urls_for_day(same_date_urls=same_date_urls,
+                                                                        pool=pool,
+                                                                        sess=sess,
+                                                                        parse_fn=parse_fn,
+                                                                        callback_fn=tbar.update
+                                                                        ))
+                futures.append(f)
+            # flatten처리
+            done, _ = await asyncio.wait(futures) # done: [Task]
+
+            for task in done:
+                res += task.result()
+
+        # done.result()
+        # Q) 이거 맞나?
+        return res
+
     async def _crawl_and_reduce(
             self,
-            urls: Iterable[str],
+            urls: Iterable[str],  # flatten한 모든 url
             include_reporter_name: bool,
             parse_fn: Optional[Callable[[str], T]] = None,
             callback_fn: Optional[Callable[[Tuple[str, str]], None]] = None,
     ):
+        # yejin: 하루 안에서는 순서대로 해 겹치지 말고
         # # Create a semaphore to limit the number of concurrent tasks, a process-pool
         # # executor to run `parse_fn` in parallel and a http client session for
         # # asynchronous HTTP requests.
@@ -86,38 +149,30 @@ class Crawler:
             headers=self.request_headers,
             timeout=ClientTimeout(total=self.request_timeout),
         )
-
         futures = []
+        # 하루에 대해서
+        pool = ProcessPoolExecutor(max_workers=self.num_parsing_processes)
         for url in urls:
-            # await sem.acquire()
-            #
-            # # Create a fetching future.
-            # f = asyncio.ensure_future(
-            #
-            # Remove duplicated urls
-            if self.is_duplicate(sess, url):
-                break
-            else:
-                await sem.acquire()
+            await sem.acquire()
 
-                # Create a fetching future.
-                f = asyncio.ensure_future(
-                    self._fetch_and_parse(sem, pool, sess, url, include_reporter_name, parse_fn)
-                )
-                # Add done-callback function to the future.
-                if callback_fn is not None:
-                    f.add_done_callback(lambda k: callback_fn(data=k.result()))
-                futures.append(f)
+            # Create a fetching future.
+            f = asyncio.ensure_future(
+                self._fetch_and_parse(sem, pool, sess, url, include_reporter_name, parse_fn)
+            )
+            # Add done-callback function to the future.
+            if callback_fn is not None:
+                f.add_done_callback(lambda k: callback_fn(data=k.result()))
+            futures.append(f)
 
-        # Wait for the tasks to be complete and close the http client session and
-        # process-pool executor
+            # Wait for the tasks to be complete and close the http client session and
+            # process-pool executor
         await asyncio.wait(futures)
         await sess.close()
         pool.shutdown(wait=True)
 
     def reduce_to_array(
             self,
-            urls: Iterable[str],
+            urls: Iterable[str],  # 모든 페이지
             include_reporter_name: bool,
             parse_fn: Optional[Callable[[str], T]] = None,
             update_fn: Optional[Callable[[], None]] = None,
@@ -135,8 +190,11 @@ class Crawler:
         utils.ignore_aiohttp_ssl_error(loop)
 
         results = []
-        loop.run_until_complete(self._crawl_and_reduce(urls, include_reporter_name, parse_fn, callback_fn))
 
+        # 중복 제거
+
+        done = loop.run_until_complete(self._preprocess_urls(urls, False, parse_fn)) # 리턴값; 하루에 봐야할 페이지들
+        loop.run_until_complete(self._crawl_and_reduce(done, include_reporter_name, parse_fn, callback_fn))
         return results
 
     def reduce_to_file(

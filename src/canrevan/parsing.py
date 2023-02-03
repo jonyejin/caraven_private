@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup, SoupStrainer
 import utils as utils
 
 
-def extract_article_urls(document: str, _: bool) -> List[str]:
+def extract_article_urls(document: str, _: bool = False) -> List[str]:
     document = document[document.find('<ul class="type06_headline">'):]
 
     # Extract article url containers.
