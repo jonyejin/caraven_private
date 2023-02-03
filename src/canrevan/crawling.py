@@ -28,6 +28,25 @@ class Crawler:
         self.request_headers = request_headers
         self.request_timeout = request_timeout
 
+    comparing_with_last_body = ""
+
+    async def is_duplicate(
+            self,
+            sess: ClientSession,
+            url: str
+    ) -> bool:
+        nonlocal comparing_with_last_body
+        try:
+            async with sess.get(url) as resp:
+                content = await resp.text()
+                if content == comparing_with_last_body:
+                    raise ValueError("same page from now on")
+                else:
+                    comparing_with_last_body = content
+                    return False
+        except Exception:
+            return True
+
     async def _fetch_and_parse(
             self,
             sem: Semaphore,
@@ -59,9 +78,9 @@ class Crawler:
             parse_fn: Optional[Callable[[str], T]] = None,
             callback_fn: Optional[Callable[[Tuple[str, str]], None]] = None,
     ):
-        # Create a semaphore to limit the number of concurrent tasks, a process-pool
-        # executor to run `parse_fn` in parallel and a http client session for
-        # asynchronous HTTP requests.
+        # # Create a semaphore to limit the number of concurrent tasks, a process-pool
+        # # executor to run `parse_fn` in parallel and a http client session for
+        # # asynchronous HTTP requests.
         sem = Semaphore(self.concurrent_tasks)
         pool = ProcessPoolExecutor(max_workers=self.num_parsing_processes)
         sess = ClientSession(
@@ -71,18 +90,25 @@ class Crawler:
 
         futures = []
         for url in urls:
-            await sem.acquire()
+            # await sem.acquire()
+            #
+            # # Create a fetching future.
+            # f = asyncio.ensure_future(
+            #
+            # Remove duplicated urls
+            if self.is_duplicate(sess, url):
+                break
+            else:
+                await sem.acquire()
 
-            # Create a fetching future.
-            f = asyncio.ensure_future(
-                self._fetch_and_parse(sem, pool, sess, url, include_reporter_name, parse_fn)
-            )
-
-            # Add done-callback function to the future.
-            if callback_fn is not None:
-                f.add_done_callback(lambda k: callback_fn(data=k.result()))
-
-            futures.append(f)
+                # Create a fetching future.
+                f = asyncio.ensure_future(
+                    self._fetch_and_parse(sem, pool, sess, url, include_reporter_name, parse_fn)
+                )
+                # Add done-callback function to the future.
+                if callback_fn is not None:
+                    f.add_done_callback(lambda k: callback_fn(data=k.result()))
+                futures.append(f)
 
         # Wait for the tasks to be complete and close the http client session and
         # process-pool executor

@@ -91,7 +91,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         "--skip_days", default=1, type=int, help="number of days to skip from crawling"
     )
     parser.add_argument(
-        "--max_page", default=10, type=int, help="maximum number of pages to navigate"
+        "--max_page", default=100, type=int, help="maximum number of pages to navigate"
     )
     parser.add_argument(
         "--timeout", default=5, type=float, help="timeout for the whole request"
@@ -104,7 +104,7 @@ def _create_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--num_cores",
-        default=4,
+        default=16,
         type=int,
         help="number of multi-processing cores for parsing",
     )
