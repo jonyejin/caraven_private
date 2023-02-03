@@ -99,15 +99,13 @@ class Crawler:
             self,
             urls: Iterable[Iterable[str]],  # 모든 url
             include_reporter_name: bool,
+            sess: ClientSession,
             parse_fn: Optional[Callable[[str], T]] = None,
             callback_fn: Optional[Callable[[Tuple[str, str]], None]] = None,
     ) -> Iterable[str]:
         res = []
         # yejin: 하루 안에서는 순서대로 해 겹치지 말고
-        sess = ClientSession(
-            headers=self.request_headers,
-            timeout=ClientTimeout(total=self.request_timeout),
-        )
+        
         pool = ProcessPoolExecutor(max_workers=10)
 
         # without_overlaps
@@ -126,7 +124,6 @@ class Crawler:
                 futures.append(f)
             # flatten처리
             done, _ = await asyncio.wait(futures) # done: [Task]
-            await sess.close()
             for task in done:
                 res += task.result()
 
@@ -169,7 +166,6 @@ class Crawler:
             # Wait for the tasks to be complete and close the http client session and
             # process-pool executor
         await asyncio.wait(futures)
-        await sess.close()
         pool.shutdown(wait=True)
 
     def reduce_to_array(
@@ -189,13 +185,18 @@ class Crawler:
 
         # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
         loop = asyncio.get_event_loop()
-        utils.ignore_aiohttp_ssl_error(loop)
+        # utils.ignore_aiohttp_ssl_error(loop)
 
         results = []
 
         # 중복 제거
 
-        done = loop.run_until_complete(self._preprocess_urls(urls, False, parse_fn)) # 리턴값; 하루에 봐야할 페이지들
+        sess = ClientSession(
+            headers=self.request_headers,
+            timeout=ClientTimeout(total=self.request_timeout),
+        )
+
+        done = loop.run_until_complete(self._preprocess_urls(urls, False, sess, parse_fn)) # 리턴값; 하루에 봐야할 페이지들
         loop.run_until_complete(self._crawl_and_reduce(done, include_reporter_name, parse_fn, callback_fn))
         return results
 
@@ -248,7 +249,7 @@ class Crawler:
 
                 # Get event loop and set to ignore `SSLError`s from `aiohttp` module.
                 loop = asyncio.get_event_loop()
-                utils.ignore_aiohttp_ssl_error(loop)
+                # utils.ignore_aiohttp_ssl_error(loop)
 
                 written = 0
                 loop.run_until_complete(self._crawl_and_reduce(urls, include_reporter_name, parse_fn, callback_fn))
