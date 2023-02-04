@@ -95,11 +95,11 @@ def _create_argument_parser() -> argparse.ArgumentParser:
         "--max_page", default=10, type=int, help="maximum number of pages to navigate"
     )
     parser.add_argument(
-        "--timeout", default=15, type=float, help="timeout for the whole request"
+        "--timeout", default=60, type=float, help="timeout for the whole request"
     )
     parser.add_argument(
         "--max_jobs",
-        default=500,
+        default=2,
         type=int,
         help="maximum number of concurrent requests",
     )
