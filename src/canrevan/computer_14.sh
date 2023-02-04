@@ -1,0 +1,10 @@
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210510 --end_date 20210510 --max_page 500 --num_cores 8 --directory_name 20210510 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210511 --end_date 20210511 --max_page 500 --num_cores 8 --directory_name 20210511 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210512 --end_date 20210512 --max_page 500 --num_cores 8 --directory_name 20210512 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210513 --end_date 20210513 --max_page 500 --num_cores 8 --directory_name 20210513 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210514 --end_date 20210514 --max_page 500 --num_cores 8 --directory_name 20210514 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210515 --end_date 20210515 --max_page 500 --num_cores 8 --directory_name 20210515 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210516 --end_date 20210516 --max_page 500 --num_cores 8 --directory_name 20210516 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210517 --end_date 20210517 --max_page 500 --num_cores 8 --directory_name 20210517 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210518 --end_date 20210518 --max_page 500 --num_cores 8 --directory_name 20210518 --max_jobs 1
+python3 __main__.py --category 101 102 103 104 105 --start_date 20210519 --end_date 20210519 --max_page 500 --num_cores 8 --directory_name 20210519 --max_jobs 1
